@@ -32,11 +32,15 @@
 | LinkedIn | `src/config/contact.js` | ✓ linkedin.com/in/parsa-shirvani-429b743ab |
 | تلگرام | `src/config/contact.js` | ✓ t.me/IcyParsa |
 | شماره تماس | `src/config/contact.js` | ✓ +98 903 573 3911 |
+| عکس پروفایل | `public/me.jpg` | ✓ در Hero با حلقه گرادیانی متحرک |
+| اعلان تلگرام دانلود PDF | `src/config/notify.js` | ✓ Worker: dark-grass-6fc2.pshgamer45.workers.dev — تست curl و مرورگر موفق |
 | لینک رزومه سازمانی | `src/config/contact.js` → `ORG_RESUME.url` | خالی (سایت شرکت down است؛ دکمه placeholder نمایش داده می‌شود) |
 | سال دیپلم | `src/config/data.js` | پیش‌فرض ۱۴۰۲ / 2023 —نیاز به تأیید |
 | سطح انگلیسی/ترکی | `src/config/data.js` | متوسط / مادری — نیاز به تأیید |
+| توضیحات کامل‌تر پروژه‌ها | `src/config/data.js` | کاربر گفت «بعدا بیشتر می‌کنیم» |
 
 **تأیید تماس (تست مرورگر):** هر ۵ لینک کانال درست رندر و کلیک‌پذیرند — mailto / github / linkedin / t.me / tel ✓
+**تأیید اعلان (تست مرورگر):** کلیک روی «دانلود PDF» → درخواست به Worker ثبت شد در performance/fetch-hook ✓ + پیام تلگرام در تست curl دریافت شد
 
 ## کارهای انجام‌شده
 
