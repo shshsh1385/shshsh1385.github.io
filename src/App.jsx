@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, useInView, useAnimation } from 'framer-motion'
 import { useApp, fadeUp } from './context/AppContext.jsx'
 import { CONTACT, ORG_RESUME, RESUME_PDF_URL } from './config/contact.js'
-import { notifyDownload, openResume, openPrintView } from './config/notify.js'
+import { track, sendMessage, openResume, openPrintView } from './config/notify.js'
 
 // ── small shared bits ─────────────────────────────────────────
 
@@ -234,7 +234,7 @@ function Hero() {
             href={RESUME_PDF_URL}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => notifyDownload()}
+            onClick={() => track('resume_download')}
             className="rounded-full border border-zinc-300 px-7 py-3 font-bold transition hover:border-indigo-400 hover:text-indigo-500 dark:border-zinc-700 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
           >
             📄 {t.hero.download}
@@ -349,7 +349,7 @@ function Projects() {
             </>
           )
           return p.url ? (
-            <a key={p.name} href={p.url} target="_blank" rel="noopener noreferrer" className="block">
+            <a key={p.name} href={p.url} target="_blank" rel="noopener noreferrer" className="block" onClick={() => track('project_click', { project: p.name })}>
               <Card i={i} className="h-full transition hover:-translate-y-1 hover:shadow-md">
                 {inner}
               </Card>
@@ -434,14 +434,69 @@ function OrgResume() {
 
 // ── Contact / Footer ──────────────────────────────────────────
 
+function MessageForm() {
+  const { t, lang } = useApp()
+  const [name, setName] = useState('')
+  const [msg, setMsg] = useState('')
+  const [state, setState] = useState('idle') // idle | sending | sent | error
+
+  const fa = lang === 'fa'
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || !msg.trim() || state === 'sending') return
+    setState('sending')
+    track('contact_form')
+    const ok = await sendMessage(name.trim(), msg.trim())
+    setState(ok ? 'sent' : 'error')
+    if (ok) { setName(''); setMsg('') }
+  }
+
+  const labels = fa
+    ? { name: 'نام شما', msg: 'پیام شما', send: 'ارسال پیام', sending: 'در حال ارسال…', sent: '✓ ارسال شد — ممنون!', error: '✗ خطا — از تلگرام استفاده کنید', title: 'یا مستقیم پیام بدهید:' }
+    : { name: 'Your name', msg: 'Your message', send: 'Send message', sending: 'Sending…', sent: '✓ Sent — thank you!', error: '✗ Error — use Telegram instead', title: 'Or send a direct message:' }
+
+  if (state === 'sent') {
+    return <p className="mt-6 font-bold text-green-600 dark:text-green-400">{labels.sent}</p>
+  }
+
+  return (
+    <form onSubmit={submit} className="mx-auto mt-8 max-w-md text-start">
+      <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">{labels.title}</p>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={labels.name}
+        required
+        className="mb-3 w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 dark:border-zinc-700 dark:bg-zinc-800"
+      />
+      <textarea
+        value={msg}
+        onChange={(e) => setMsg(e.target.value)}
+        placeholder={labels.msg}
+        required
+        rows={4}
+        className="mb-3 w-full rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 dark:border-zinc-700 dark:bg-zinc-800"
+      />
+      <button
+        type="submit"
+        disabled={state === 'sending'}
+        className="w-full rounded-xl bg-indigo-600 px-5 py-2.5 font-bold text-white transition hover:bg-indigo-500 disabled:opacity-60"
+      >
+        {state === 'sending' ? labels.sending : labels.send}
+      </button>
+      {state === 'error' && <p className="mt-2 text-sm text-red-500">{labels.error}</p>}
+    </form>
+  )
+}
+
 function Contact() {
   const { t, lang } = useApp()
   const channels = [
-    CONTACT.email && { label: 'Email', value: CONTACT.email, href: `mailto:${CONTACT.email}` },
-    CONTACT.github && { label: 'GitHub', value: `github.com/${CONTACT.github}`, href: `https://github.com/${CONTACT.github}` },
-    CONTACT.linkedin && { label: 'LinkedIn', value: 'LinkedIn', href: CONTACT.linkedin },
-    CONTACT.telegram && { label: 'Telegram', value: '@IcyParsa', href: CONTACT.telegram },
-    CONTACT.phone && { label: 'Phone', value: CONTACT.phone, href: `tel:${CONTACT.phone.replace(/\s/g, '')}` },
+    CONTACT.email && { label: 'Email', value: CONTACT.email, href: `mailto:${CONTACT.email}`, ev: 'contact_email' },
+    CONTACT.github && { label: 'GitHub', value: `github.com/${CONTACT.github}`, href: `https://github.com/${CONTACT.github}`, ev: 'contact_github' },
+    CONTACT.linkedin && { label: 'LinkedIn', value: 'LinkedIn', href: CONTACT.linkedin, ev: 'contact_linkedin' },
+    CONTACT.telegram && { label: 'Telegram', value: '@IcyParsa', href: CONTACT.telegram, ev: 'contact_telegram' },
+    CONTACT.phone && { label: 'Phone', value: CONTACT.phone, href: `tel:${CONTACT.phone.replace(/\s/g, '')}`, ev: 'contact_phone' },
   ].filter(Boolean)
 
   return (
@@ -456,6 +511,7 @@ function Contact() {
                 href={c.href}
                 target={c.href.startsWith('http') ? '_blank' : undefined}
                 rel="noopener noreferrer"
+                onClick={() => track(c.ev)}
                 className="rounded-full border border-zinc-300 px-5 py-2.5 font-semibold transition hover:border-indigo-400 hover:text-indigo-500 dark:border-zinc-700 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
               >
                 {c.label} ↗
@@ -471,6 +527,7 @@ function Contact() {
         <div className="mt-6">
           <Chip>{CONTACT.location[lang]}</Chip>
         </div>
+        <MessageForm />
       </Card>
     </Section>
   )

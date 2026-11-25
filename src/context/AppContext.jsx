@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { DATA } from '../config/data.js'
+import { track } from '../config/notify.js'
 
 const AppContext = createContext(null)
 
@@ -20,6 +21,17 @@ export function AppProvider({ children }) {
     root.dir = t.dir
     localStorage.setItem('lang', lang)
   }, [lang, t])
+
+  // page view on first load + language switch events (session-deduped)
+  useEffect(() => {
+    const marked = sessionStorage.getItem('pv_' + lang)
+    if (!marked) {
+      sessionStorage.setItem('pv_' + lang, '1')
+      track('page_view', { lang })
+    } else {
+      track('lang_switch', { lang })
+    }
+  }, [lang])
 
   useEffect(() => {
     const root = document.documentElement

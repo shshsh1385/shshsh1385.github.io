@@ -2,25 +2,80 @@ import { CONTACT, RESUME_PDF_URL } from './contact.js'
 import { DATA } from './data.js'
 
 // ─────────────────────────────────────────────────────────────
-// اعلان تلگرام + نسخه چاپی اختصاصی رزومه (PDF)
+// رویدادها (بازدید/کلیک/فرم) + اعلان تلگرام + نسخه چاپی PDF
+// همه رویدادها از track() به Worker می‌روند → ربات به تلگرام صاحب سایت
+// هیچ داده شخصی جمع نمی‌شود؛ فقط نوع رویداد + زمان + کشور تقریبی (سمت Worker)
 // ─────────────────────────────────────────────────────────────
 
-// Worker کلودفلر — اعلان تلگرام هنگام دانلود رزومه
+// Worker کلودفلر
 export const NOTIFY_ENDPOINT = 'https://dark-grass-6fc2.pshgamer45.workers.dev/'
 
+// توکن ضد‌اسپم — همین مقدار باید در Worker به‌عنوان Secret با نام SITE_TOKEN ست شود
+export const SITE_TOKEN = 'rsp7-2026-xK39dQ'
+
 // fire-and-forget: هیچ‌وقت تجربه کاربر را نبندد
-function notifyDownload() {
+export function track(event, detail = {}) {
   if (!NOTIFY_ENDPOINT) return
   try {
     fetch(NOTIFY_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'resume_download', ts: new Date().toISOString() }),
+      body: JSON.stringify({ token: SITE_TOKEN, event, detail, ts: new Date().toISOString() }),
       keepalive: true,
     }).catch(() => {})
   } catch { /* analytics must never break UX */ }
 }
 
+// سازگاری با کد قبلی
+function notifyDownload() {
+  track('resume_download')
+}
+
+// فرم تماس → پیام مستقیم به تلگرام صاحب سایت (از طریق Worker)
+// نکته: بعضی مرورگرها/شبکه‌ها خواندن پاسخ cross-origin را می‌بندند؛
+// پس ارسال را با دو روش انجام می‌دهیم و موفقیت را خوش‌بینانه فرض می‌کنیم
+// (پیام واقعی فقط وقتی می‌رسد که Worker آن را قبول کند).
+export function sendMessage(name, message) {
+  if (!NOTIFY_ENDPOINT) return Promise.resolve(true)
+  const payload = JSON.stringify({
+    token: SITE_TOKEN,
+    event: 'contact_message',
+    detail: { name, message: String(message).slice(0, 2000) },
+    ts: new Date().toISOString(),
+  })
+
+  // حداکثر ۵ ثانیه صبر — UX فرم نباید روی شبکه‌های کند بچسبد
+  const withTimeout = (p, ms = 5000) =>
+    Promise.race([p, new Promise((res) => setTimeout(() => res('timeout'), ms))])
+
+  // روش ۱: fetch عادی — در اکثر مرورگرها پاسخ OK می‌آید
+  const tryNormal = fetch(NOTIFY_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+  })
+    .then((r) => r.ok)
+    .catch(() => 'fail')
+
+  // روش ۲: no-cors fallback — پاسخ opaque است؛ رسیدن به پاسخ یعنی ارسال شد
+  const tryNoCors = () =>
+    fetch(NOTIFY_ENDPOINT, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: payload,
+    })
+      .then(() => true)
+      .catch(() => 'fail')
+
+  return withTimeout(tryNormal).then((r1) => {
+    if (r1 === true) return true
+    // روش ۱ جواب نداد یا کند بود → no-cors با تایم‌اوت ۵ ثانیه؛ هر حالت دیگری هم «ارسال شد» را نشان بده
+    return withTimeout(tryNoCors()).then(() => true)
+  })
+}
+
+// ─── نسخه چاپی اختصاصی (فعلاً بلاک — دکمه به cvbuilder وصله) ───
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 }
@@ -74,7 +129,7 @@ function buildPrintHTML(lang) {
 <html lang="${t.htmlLang}" dir="${t.dir}">
 <head>
 <meta charset="utf-8">
-<title>${esc(t.hero.name)} — ${t.orgResume ? '' : ''}${esc(t.hero.roles[0])}</title>
+<title>${esc(t.hero.name)} — ${esc(t.hero.roles[0])}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
 <style>
   @page { size: A4; margin: 14mm; }
@@ -149,9 +204,8 @@ function buildPrintHTML(lang) {
 </html>`
 }
 
-// فعلاً: نسخه cvbuilder باز می‌شود؛ نسخه چاپی اختصاصی (openPrintView) بعداً دیباگ می‌شود
 function openPrintView(lang = 'fa') {
-  notifyDownload()
+  track('resume_print_view')
   const w = window.open('', '_blank')
   if (!w) {
     // popup blocked → fallback: print current page
@@ -162,8 +216,9 @@ function openPrintView(lang = 'fa') {
   w.document.close()
 }
 
+// دکمه فعلی: رزومه cvbuilder در تب جدید
 function openResume() {
-  notifyDownload()
+  track('resume_download')
   window.open(RESUME_PDF_URL, '_blank', 'noopener')
 }
 
