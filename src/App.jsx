@@ -214,9 +214,6 @@ function Hero() {
           />
         </motion.div>
 
-        <p className="mb-3 font-mono text-sm text-zinc-500 dark:text-zinc-400">
-          {isRTL ? 'سلام، من هستم' : "Hi, I'm"}
-        </p>
         <h1 className="mb-4 text-5xl font-black tracking-tight md:text-7xl">
           {t.hero.name}
         </h1>
