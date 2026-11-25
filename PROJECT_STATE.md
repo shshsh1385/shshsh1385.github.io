@@ -74,12 +74,18 @@
 
 ## مراحل بعدی (انتشار — نیازمند اطلاعات/دستور کاربر)
 
-1. دریافت: یوزرنیم گیت‌هاب، ایمیل، LinkedIn، لینک رزومه سازمانی
-2. جایگذاری در `src/config/contact.js` (و `data.js` در صورت تغییر سال دیپلم/سطح زبان‌ها)
-3. `git init` + commit اولیه
-4. ساخت ریپوی `username.github.io` روی گیت‌هاب و push (اکشن خارجی — قبل از انجام با کاربر هماهنگ شود)
-5. فعال‌سازی GitHub Pages از شاخه `gh-pages`/Actions در تنظیمات ریپو
-6. بعداً: اتصال دامنه اختصاصی (فایل CNAME + رکوردهای DNS)
+1. ✓ اطلاعات تماس کامل شد
+2. ✓ عکس، دکمه PDF (نسخه cvbuilder)، اعلان تلگرام، رویدادها، فرم تماس
+3. **کاربر:** Worker v2 (`worker/worker.js`) را در کلودفلر deploy کند + Secret جدید `SITE_TOKEN=rsp7-2026-xK39dQ` + تنظیم webhook (`/webhook`) + Cron `0 21 * * *`
+4. push به `shshsh1385.github.io` (راهنما در README)
+5. بعداً: دیباگ نسخه چاپی اختصاصی (`openPrintView`)، توضیحات کامل‌تر پروژه‌ها، لینک رزومه سازمانی
+
+### وضعیت ربات/ردیابی (آخرین به‌روزرسانی)
+
+- سایت: `track()` برای page_view / lang_switch / resume_download / project_click / contact_* — با توکن SITE_TOKEN
+- فرم تماس: `sendMessage()` با تایم‌اوت ۵ث + no-cors fallback (باگ IAB/CORS حل شد — «ارسال شد» تأیید شد)
+- Worker v2: رویدادها با ایموجی، ضداسپم (۳۰/ساعت)، mute/unmute/stats، خلاصه روزانه (Cron)، وب‌هوک دستورات — در `worker/worker.js`
+- نکته: تا deploy نشدن Worker v2، رویدادهای جدید به Worker فعلی (v1) می‌روند که بی‌خطر قبول می‌کند و فقط پیام خام می‌فرستد
 
 ## محدودیت‌ها / ریسک‌ها
 
