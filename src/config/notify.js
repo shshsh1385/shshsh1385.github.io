@@ -7,8 +7,8 @@
 // توکن ربات و chat_id در Worker ذخیره می‌شوند، نه در این فایل عمومی.
 // ─────────────────────────────────────────────────────────────
 
-// TODO: بعد از ساخت Worker، آدرسش را اینجا بگذارید. تا آن‌ زمان اعلان غیرفعال است و مستقیم پنجره چاپ باز می‌شود.
-export const NOTIFY_ENDPOINT = ''
+// Worker کلودفلر — اعلان تلگرام هنگام دانلود رزومه
+export const NOTIFY_ENDPOINT = 'https://dark-grass-6fc2.pshgamer45.workers.dev/'
 
 // fire-and-forget: هیچ‌وقت تجربه کاربر را نبندد
 function notifyDownload() {
