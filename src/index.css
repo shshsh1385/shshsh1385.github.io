@@ -32,3 +32,57 @@ body {
     scroll-behavior: auto;
   }
 }
+
+/* ─── نسخه چاپی رزومه (Ctrl+P / دکمه دانلود PDF) ─── */
+@media print {
+  /* فقط محتوای اصلی — ناوبری، دکمه‌ها و افکت‌ها حذف */
+  header, footer, .print\:hidden, #org-resume {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  /* همه سکشن‌ها در یک صفحه پیوسته، بدون انیمیشن */
+  section {
+    padding: 10mm 0 !important;
+    break-inside: avoid;
+  }
+  section:first-of-type {
+    min-height: auto !important;
+  }
+  /* کارت‌ها: خط باریک، بدون سایه */
+  .rounded-2xl {
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+  /* رنگ متن‌ها روی سفید خوانا شود */
+  .text-zinc-600, .text-zinc-700, .text-zinc-500, .dark .text-zinc-300, .dark .text-zinc-400 {
+    color: #333 !important;
+  }
+  h1, h2, h3, .font-bold, .font-extrabold, .font-black {
+    color: #000 !important;
+  }
+  .text-indigo-500, .dark .text-indigo-400 {
+    color: #4338ca !important;
+  }
+  /* نوارهای مهارت در چاپ: نشانگر ثابت با درصد */
+  .print-bar-track {
+    border: 1px solid #ccc !important;
+    background: #fff !important;
+  }
+  .print-bar-fill {
+    background: #4f46e5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* عکس پروفایل کوچک‌تر و ثابت */
+  img {
+    box-shadow: none !important;
+  }
+  @page {
+    margin: 14mm;
+  }
+}

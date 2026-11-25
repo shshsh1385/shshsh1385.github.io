@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, useInView, useAnimation } from 'framer-motion'
 import { useApp, fadeUp } from './context/AppContext.jsx'
 import { CONTACT, ORG_RESUME } from './config/contact.js'
+import { openPrintView } from './config/notify.js'
 
 // ── small shared bits ─────────────────────────────────────────
 
@@ -193,6 +194,26 @@ function Hero() {
         transition={{ duration: 0.7, ease: 'easeOut' }}
         className="relative z-10 mx-auto max-w-3xl px-6 text-center"
       >
+        {/* profile photo with animated gradient ring */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
+          className="relative mx-auto mb-6 h-36 w-36 md:h-44 md:w-44"
+        >
+          <motion.span
+            aria-hidden
+            className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-indigo-500 via-violet-500 to-fuchsia-500"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: true, ease: 'linear' }}
+          />
+          <img
+            src="./me.jpg"
+            alt={t.hero.name}
+            className="relative h-full w-full rounded-full border-4 border-white object-cover object-top shadow-xl dark:border-zinc-900"
+          />
+        </motion.div>
+
         <p className="mb-3 font-mono text-sm text-zinc-500 dark:text-zinc-400">
           {isRTL ? 'سلام، من هستم' : "Hi, I'm"}
         </p>
@@ -212,14 +233,13 @@ function Hero() {
           >
             {t.hero.cta}
           </a>
-          {CONTACT.email && (
-            <a
-              href={`mailto:${CONTACT.email}`}
-              className="rounded-full border border-zinc-300 px-7 py-3 font-bold transition hover:border-indigo-400 dark:border-zinc-700 dark:hover:border-indigo-500"
-            >
-              {t.contact.title}
-            </a>
-          )}
+          <a
+            href="#resume-pdf"
+            onClick={(e) => { e.preventDefault(); openPrintView(); }}
+            className="rounded-full border border-zinc-300 px-7 py-3 font-bold transition hover:border-indigo-400 hover:text-indigo-500 dark:border-zinc-700 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
+          >
+            📄 {t.hero.download}
+          </a>
         </div>
       </motion.div>
     </section>
@@ -257,9 +277,9 @@ function SkillBar({ skill, i }) {
           {skill.level}%
         </motion.span>
       </div>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-200 print-bar-track dark:bg-zinc-800">
         <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 print-bar-fill"
           initial={{ width: 0 }}
           animate={inView ? { width: `${skill.level}%` } : {}}
           transition={{ duration: 1, delay: i * 0.08, ease: 'easeOut' }}
