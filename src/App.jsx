@@ -171,7 +171,7 @@ function Typewriter({ words, isRTL }) {
 }
 
 function Hero() {
-  const { t, isRTL } = useApp()
+  const { t, isRTL, lang } = useApp()
   return (
     <section id="top" className="relative flex min-h-screen items-center justify-center overflow-hidden">
       {/* soft gradient blobs */}
@@ -232,7 +232,7 @@ function Hero() {
           </a>
           <a
             href="#resume-pdf"
-            onClick={(e) => { e.preventDefault(); openPrintView(); }}
+            onClick={(e) => { e.preventDefault(); openPrintView(lang); }}
             className="rounded-full border border-zinc-300 px-7 py-3 font-bold transition hover:border-indigo-400 hover:text-indigo-500 dark:border-zinc-700 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
           >
             📄 {t.hero.download}
