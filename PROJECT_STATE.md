@@ -4,14 +4,28 @@
 
 ## هویت پروژه
 
-- **هدف:** سایت رزومه شخصی دوزبانه (FA/EN) برای پارسا شیروانی، قابل هاست روی GitHub Pages (user site) و اتصال دامنه بعداً
+- **هدف:** سایت رزومه شخصی دوزبانه (FA/EN) برای پارسا شیروانی
 - **استک:** React 19 + Vite 7 + Tailwind CSS 4 + Framer Motion 12
-- **وضعیت:** `EXECUTION_MODE` → پیاده‌سازی کامل و تست لوکال انجام شد؛ انتشار (push به گیت‌هاب) منتظر اطلاعات و دستور کاربر
+- **وضعیت:** `COMPLETED` — **سایت لایو شد:** https://shshsh1385.github.io (deploy با GitHub Actions — build_type=workflow)
+- **ریپو:** https://github.com/shshsh1385/shshsh1385.github.io (public, branch main)
+- **انتشار:** هر `git push` به main → بیلد و deploy خودکار
+
+## تأییدهای سایت لایو (تست 2026-11-26)
+
+- HTTP 200 + عنوان فارسی ✓ · رندر React (h1، ۸ سکشن) ✓ · عکس لود ✓ · فرم تماس ✓ · ۵ لینک کانال ✓
+
+## ردیابی و اعلان
+
+- Worker: https://dark-grass-6fc2.pshgamer45.workers.dev/ (نسخه v2 در `worker/worker.js` — کاربر باید deploy کند)
+- SITE_TOKEN: `rsp7-2026-xK39dQ` (در `src/config/notify.js` — Secret هم‌نام در Worker لازم است)
+- رویدادها: page_view / lang_switch / resume_download / project_click / contact_* / contact_message (فرم)
+- Worker v2: ضداسپم ۳۰/ساعت، دستورات /stats /mute /unmute /help (webhook)، خلاصه روزانه (cron `0 21 * * *` = 00:30 ایران)
+- **قدم باقی‌مانده کاربر:** deploy Worker v2 + Secret SITE_TOKEN + setWebhook + Cron (راهنما در پریم عمومی و کامنت‌های worker/worker.js)
 
 ## منابع داده
 
 - رزومه مرجع: https://cvbuilder.me/Resume/fa/283d04f9-c5a6-4c32-8864-5112d192aa49?template=Template34
-- سیستم پرامپت‌ها: `C:\Users\pshga\OneDrive\Desktop\Website-Client-Prompt-System` (۹۵ فایل، کامل خوانده و ثبت شده — ماشین وضعیت: COLLECTION → REVIEW → EXECUTION)
+- سیستم پرامپت‌ها: `C:\Users\pshga\OneDrive\Desktop\Website-Client-Prompt-System` (۹۵ فایل — ماشین وضعیت COLLECTION→REVIEW→EXECUTION طی شد)
 - گزارش بررسی (REVIEW) توسط کاربر تأیید شد؛ تصمیم‌ها: React+Vite، تم مینیمال با پیش‌فرض تیره + سوییچ روشن، مهارت‌ها با نوار درصدی متحرک
 
 ## رجیستری پرامپت‌ها
