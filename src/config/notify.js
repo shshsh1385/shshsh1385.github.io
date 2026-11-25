@@ -1,4 +1,4 @@
-import { CONTACT } from './contact.js'
+import { CONTACT, RESUME_PDF_URL } from './contact.js'
 import { DATA } from './data.js'
 
 // ─────────────────────────────────────────────────────────────
@@ -149,6 +149,7 @@ function buildPrintHTML(lang) {
 </html>`
 }
 
+// فعلاً: نسخه cvbuilder باز می‌شود؛ نسخه چاپی اختصاصی (openPrintView) بعداً دیباگ می‌شود
 function openPrintView(lang = 'fa') {
   notifyDownload()
   const w = window.open('', '_blank')
@@ -161,4 +162,9 @@ function openPrintView(lang = 'fa') {
   w.document.close()
 }
 
-export { openPrintView }
+function openResume() {
+  notifyDownload()
+  window.open(RESUME_PDF_URL, '_blank', 'noopener')
+}
+
+export { openPrintView, openResume, notifyDownload }

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useInView, useAnimation } from 'framer-motion'
 import { useApp, fadeUp } from './context/AppContext.jsx'
-import { CONTACT, ORG_RESUME } from './config/contact.js'
-import { openPrintView } from './config/notify.js'
+import { CONTACT, ORG_RESUME, RESUME_PDF_URL } from './config/contact.js'
+import { notifyDownload, openResume, openPrintView } from './config/notify.js'
 
 // ── small shared bits ─────────────────────────────────────────
 
@@ -231,8 +231,10 @@ function Hero() {
             {t.hero.cta}
           </a>
           <a
-            href="#resume-pdf"
-            onClick={(e) => { e.preventDefault(); openPrintView(lang); }}
+            href={RESUME_PDF_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => notifyDownload()}
             className="rounded-full border border-zinc-300 px-7 py-3 font-bold transition hover:border-indigo-400 hover:text-indigo-500 dark:border-zinc-700 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
           >
             📄 {t.hero.download}

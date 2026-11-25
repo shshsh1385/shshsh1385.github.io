@@ -17,3 +17,7 @@ export const ORG_RESUME = {
   },
   url: '',               // TODO: لینک رزومه سازمانی
 }
+
+// ─── رزومه PDF فعلی (فعلاً نسخه cvbuilder — نسخه اختصاصی بعداً دیباگ می‌شود) ───
+export const RESUME_PDF_URL =
+  'https://cvbuilder.me/Resume/fa/283d04f9-c5a6-4c32-8864-5112d192aa49?template=Template34'
