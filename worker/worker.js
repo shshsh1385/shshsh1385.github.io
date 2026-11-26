@@ -440,9 +440,13 @@ async function handleUpdate(update) {
   if (msg.photo && Array.isArray(msg.photo) && msg.photo.length) {
     try {
       const photo = msg.photo[msg.photo.length - 1] // بزرگ‌ترین سایز
-      const file = await (await fetch(`https://api.telegram.org/bot${env0.BOT_TOKEN}/getFile?file_id=${photo.file_id}`)).json()
-      if (!file?.file_path) throw new Error('getFile failed')
+      const fr = await fetch(`https://api.telegram.org/bot${env0.BOT_TOKEN}/getFile?file_id=${encodeURIComponent(photo.file_id)}`)
+      const file = await fr.json().catch(() => null)
+      if (!fr.ok || !file?.file_path) {
+        throw new Error(`getFile ${fr.status}: ${esc(file?.description || fr.statusText || 'unknown')}`)
+      }
       const img = new Uint8Array(await (await fetch(`https://api.telegram.org/file/bot${env0.BOT_TOKEN}/${file.file_path}`)).arrayBuffer())
+      if (!img.length) throw new Error('فایل خالی از تلگرام')
       const { sha, bytes: oldBytes } = await ghGetBinary(PHOTO_PATH)
       await ghCommitBinary(PHOTO_PATH, img, sha, 'bot: update profile photo')
       await putKV('last_commit', JSON.stringify({ type: 'photo', beforeBytes: Array.from(oldBytes), summary: 'عکس پروفایل' }))
