@@ -1,4 +1,4 @@
-// ─── اطلاعات تماس و لینک‌ها ───
+// ─── اطلاعات تماس ثابت (از تلگرام ویرایش نمی‌شود) ───
 export const CONTACT = {
   email: 'shirvaniparsa85@gmail.com',
   github: 'shshsh1385',
@@ -8,16 +8,6 @@ export const CONTACT = {
   location: { fa: 'زنجان، ایران', en: 'Zanjan, Iran' },
 }
 
-// ─── رزومه سازمانی (سایت شرکت فعلاً down است) ───
-export const ORG_RESUME = {
-  label: { fa: 'رزومه سازمانی', en: 'Corporate Resume' },
-  note: {
-    fa: 'رزومه رسمی در سامانه شرکت — لینک به‌زودی',
-    en: 'Official corporate resume — link coming soon',
-  },
-  url: '',               // TODO: لینک رزومه سازمانی
-}
+// رزومه سازمانی — لینک در content.json (site.orgResumeUrl) توسط ربات/دستی ویرایش می‌شود
+export const ORG_RESUME_URL = ''
 
-// ─── رزومه PDF فعلی (فعلاً نسخه cvbuilder — نسخه اختصاصی بعداً دیباگ می‌شود) ───
-export const RESUME_PDF_URL =
-  'https://cvbuilder.me/Resume/fa/283d04f9-c5a6-4c32-8864-5112d192aa49?template=Template34'

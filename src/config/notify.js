@@ -1,4 +1,4 @@
-import { CONTACT, RESUME_PDF_URL } from './contact.js'
+import { CONTACT } from './contact.js'
 import { DATA } from './data.js'
 
 // ─────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ function openPrintView(lang = 'fa') {
 // دکمه فعلی: رزومه cvbuilder در تب جدید
 function openResume() {
   track('resume_download')
-  window.open(RESUME_PDF_URL, '_blank', 'noopener')
+  window.open(DATA.site.resumePdfUrl, '_blank', 'noopener')
 }
 
 export { openPrintView, openResume, notifyDownload }

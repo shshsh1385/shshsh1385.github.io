@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useInView, useAnimation } from 'framer-motion'
 import { useApp, fadeUp } from './context/AppContext.jsx'
-import { CONTACT, ORG_RESUME, RESUME_PDF_URL } from './config/contact.js'
+import { CONTACT, ORG_RESUME_URL } from './config/contact.js'
 import { track, sendMessage, openResume, openPrintView } from './config/notify.js'
+import { DATA } from './config/data.js'
 
 // ── small shared bits ─────────────────────────────────────────
 
@@ -231,7 +232,7 @@ function Hero() {
             {t.hero.cta}
           </a>
           <a
-            href={RESUME_PDF_URL}
+            href={DATA.site.resumePdfUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => track('resume_download')}
@@ -413,9 +414,9 @@ function OrgResume() {
     <Section id="org-resume" title={t.orgResume.title}>
       <Card className="text-center">
         <p className="mb-5 text-zinc-600 dark:text-zinc-300">{t.orgResume.body}</p>
-        {ORG_RESUME.url ? (
+        {DATA.site.orgResumeUrl ? (
           <a
-            href={ORG_RESUME.url}
+            href={DATA.site.orgResumeUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block rounded-full bg-indigo-600 px-7 py-3 font-bold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-500"
@@ -424,7 +425,7 @@ function OrgResume() {
           </a>
         ) : (
           <span className="inline-block cursor-not-allowed rounded-full border border-dashed border-zinc-400 px-7 py-3 font-bold text-zinc-500 dark:border-zinc-600">
-            {ORG_RESUME.label[t === undefined ? 'fa' : document.documentElement.lang === 'fa' ? 'fa' : 'en']}
+            {t.orgResume.title}
           </span>
         )}
       </Card>
