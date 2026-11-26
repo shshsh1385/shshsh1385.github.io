@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#09090b"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0.85" cy="0.1" r="0.5">
+      <stop offset="0" stop-color="#6366f1" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.1" cy="0.95" r="0.5">
+      <stop offset="0" stop-color="#8b5cf6" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow1)"/>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+
+  <!-- profile circle -->
+  <clipPath id="ring">
+    <circle cx="330" cy="315" r="150"/>
+  </clipPath>
+  <circle cx="330" cy="315" r="156" fill="none" stroke="url(#accent)" stroke-width="10"/>
+  <image href="me.jpg" x="184" y="169" width="292" height="292" preserveAspectRatio="xMidYMin slice" clip-path="url(#ring)"/>
+
+  <!-- name -->
+  <text x="540" y="270" font-family="Vazirmatn, Tahoma, sans-serif" font-size="76" font-weight="900" fill="#fafafa" direction="rtl" text-anchor="end">پارسا شیروانی</text>
+  <!-- role -->
+  <text x="540" y="360" font-family="Vazirmatn, Tahoma, sans-serif" font-size="40" font-weight="700" fill="#818cf8" direction="rtl" text-anchor="end">برنامه‌نویس فول‌استک</text>
+  <!-- accent line -->
+  <rect x="300" y="395" width="240" height="8" rx="4" fill="url(#accent)"/>
+  <!-- subtitle -->
+  <text x="540" y="460" font-family="Vazirmatn, Tahoma, sans-serif" font-size="24" fill="#a1a1aa" direction="rtl" text-anchor="end">طراحی و توسعه وب‌اپلیکیشن‌های کاربردی و مقیاس‌پذیر</text>
+
+  <!-- url chip -->
+  <rect x="330" y="510" width="540" height="62" rx="31" fill="#18181b" stroke="#3f3f46"/>
+  <text x="600" y="551" font-family="Vazirmatn, Tahoma, sans-serif" font-size="26" font-weight="700" fill="#e4e4e7" text-anchor="middle" direction="ltr">shshsh1385.github.io</text>
+</svg>
