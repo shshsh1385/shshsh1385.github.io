@@ -206,6 +206,51 @@ const MENU_KB = [
   ['/backup', '/qr'], ['/undo', '/menu'],
 ]
 
+// دکمه‌های شیشه‌ای (inline) — هر دکمه یه دستور را اجرا می‌کند
+function mainMenuInline() {
+  return {
+    inline_keyboard: [
+      [{ text: '📊 آمار', callback_data: 'cmd:/stats' }, { text: '📅 امروز', callback_data: 'cmd:/today' }],
+      [{ text: '📨 پیام‌ها', callback_data: 'cmd:/msgs' }, { text: '🌐 وضعیت سایت', callback_data: 'cmd:/site' }],
+      [
+        { text: '🖼 عکس پروفایل', callback_data: 'cmd:/photo' },
+        { text: '🔗 QR سایت', callback_data: 'cmd:/qr' },
+      ],
+      [
+        { text: '💾 پشتیبان‌گیری', callback_data: 'cmd:/backup' },
+        { text: '↩️ برگرداندن', callback_data: 'cmd:/undo' },
+      ],
+      [
+        { text: '✏️ راهنمای ویرایش', callback_data: 'cmd:/edit' },
+        { text: '🔕 بی‌صدا', callback_data: 'cmd:/mute' },
+      ],
+      [{ text: '🔄 تازه‌سازی منو', callback_data: 'cmd:/menu' }],
+    ],
+  }
+}
+
+function editHelpInline() {
+  return {
+    inline_keyboard: [
+      [{ text: '🌐 وضعیت فعلی محتوا', callback_data: 'cmd:/site' }],
+      [{ text: '💾 پشتیبان قبل از ویرایش', callback_data: 'cmd:/backup' }],
+      [{ text: '🔙 بازگشت به منو', callback_data: 'cmd:/menu' }],
+    ],
+  }
+}
+
+// پاسخ به دکمه‌های شیشه‌ای
+async function handleCallback(cb) {
+  const data = cb?.data || ''
+  if (!data.startsWith('cmd:')) return
+  const cmd = data.slice(4)
+
+  // تأیید دریافت دکمه (چراغ دکمه خاموش شود)
+  await tg('answerCallbackQuery', { callback_query_id: cb.id })
+  await tg('deleteMessage', { chat_id: cb.message.chat.id, message_id: cb.message.message_id }).catch(() => {})
+  await handleCommand(cmd)
+}
+
 async function handleCommand(text) {
   const raw = (text || '').trim()
   if (!raw.startsWith('/')) return
@@ -214,21 +259,47 @@ async function handleCommand(text) {
   const args = parts.slice(1)
 
   if (cmd === '/menu') {
-    return send(
-      `🤖 <b>منوی ربات</b>\n\n` +
-      `📊 مشاهده:\n/stats — آمار این ساعت\n/today — خلاصه امروز\n/msgs — پیام‌های فرم تماس\n/site — وضعیت محتوا\n\n` +
-      `🖼 رسانه:\n/photo — عکس پروفایل جدید را بفرست (در همین چت)\n/qr — QR کد سایت\n/backup — دریافت content.json\n\n` +
-      `✏️ تغییر محتوا (پیش‌نمایش → /ok):\n` +
-      `/skill Python 92 · /skilladd Tailwind 70 · /skilldel Bootstrap\n` +
-      `/proj 1 توضیح جدید\n` +
-      `/addjob عنوان | سازمان | دوره | مورد1؛ مورد2\n` +
-      `/orglink https://... · /pdflink https://...\n` +
-      `/text fa.hero.subtitle = متن\n\n` +
-      `↩️ /undo — برگرداندن آخرین تغییر  ✅ /ok  ❌ /cancel`,
-      MENU_KB
-    )
+    return tg('sendMessage', {
+      chat_id: env0.CHAT_ID,
+      text:
+        `🤖 <b>مدیریت رزومه</b>\n` +
+        `<i>shshsh1385.github.io</i>\n\n` +
+        `از دکمه‌های زیر استفاده کن 👇\n\n` +
+        `✏️ <b>ویرایش محتوا:</b> دستور را بنویس، پیش‌نمایش می‌دهم، با /ok منتشر می‌شود.\n` +
+        `<code>/skill Python 92</code> — درصد مهارت\n` +
+        `<code>/proj 1 توضیح جدید</code> — توضیح پروژه\n` +
+        `<code>/text fa.hero.subtitle = متن</code> — هر متنی\n\n` +
+        `🖼 <b>عکس:</b> با /photo راهنما بگیر، بعد عکس را در همین چت بفرست.`,
+      parse_mode: 'HTML',
+      reply_markup: mainMenuInline(),
+    })
   }
-  if (cmd === '/help') return send('🤖 /menu را بزن برای منوی کامل.', MENU_KB)
+  if (cmd === '/edit') {
+    return tg('sendMessage', {
+      chat_id: env0.CHAT_ID,
+      text:
+        `✏️ <b>راهنمای ویرایش محتوا</b>\n\n` +
+        `جریان: دستور → پیش‌نمایش → <b>/ok</b> انتشار · <b>/cancel</b> لغو · بعدش <b>/undo</b> برگشت\n\n` +
+        `🎯 مهارت‌ها:\n` +
+        `<code>/skill Python 92</code> — تغییر درصد\n` +
+        `<code>/skilladd Tailwind 70</code> — افزودن\n` +
+        `<code>/skilldel Bootstrap</code> — حذف\n\n` +
+        `🔗 پروژه‌ها:\n` +
+        `<code>/proj 1 توضیح جدید پروژه</code>\n\n` +
+        `💼 سابقه کاری جدید:\n` +
+        `<code>/addjob عنوان | سازمان | دوره | مورد1؛ مورد2</code>\n\n` +
+        `🔗 لینک‌ها:\n` +
+        `<code>/orglink https://...</code> — رزومه سازمانی\n` +
+        `<code>/pdflink https://...</code> — دکمه PDF\n\n` +
+        `📝 هر متن دیگر:\n` +
+        `<code>/text fa.hero.subtitle = متن جدید</code>\n` +
+        `<code>/text en.about.body = English text</code>\n\n` +
+        `💡 زبان: fa / en — مسیرها را با /site ببین.`,
+      parse_mode: 'HTML',
+      reply_markup: editHelpInline(),
+    })
+  }
+  if (cmd === '/help') return send('🤖 /menu را بزن برای منوی کامل.')
 
   // ── /photo: راهنما (عکس خودش در webhook handler پردازش می‌شود) ──
   if (cmd === '/photo') {
@@ -309,19 +380,27 @@ async function handleCommand(text) {
   // ── تأیید / لغو ──
   if (cmd === '/ok') {
     const pending = JSON.parse((await getKV('pending_edit', 'null')) || 'null')
-    if (!pending) return send('چیزی در انتظار تأیید نیست.', MENU_KB)
+    if (!pending) return send('چیزی در انتظار تأیید نیست.')
     try {
       const { sha, json: current } = await ghGetContent()
       await ghCommitJson(pending.json, sha, `bot: ${pending.summary}`)
-      // برای /undo: نسخه قبلی را نگه دار
       await putKV('last_commit', JSON.stringify({ type: 'content', before: current, summary: pending.summary }))
       await putKV('pending_edit', 'null')
-      return send(`✅ کامیت شد: ${esc(pending.summary)}\n↩️ برای برگرداندن: /undo\n🚀 deploy خودکار — ~۲ دقیقه`, MENU_KB)
+      return tg('sendMessage', {
+        chat_id: env0.CHAT_ID,
+        text: `✅ <b>منتشر شد!</b>\n${esc(pending.summary)}\n\n🚀 deploy خودکار — ~۲ دقیقه بعد سایت آپدیت است.`,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '↩️ برگرداندن (undo)', callback_data: 'cmd:/undo' }, { text: '🌐 دیدن سایت', url: SITE_URL }],
+          ],
+        },
+      })
     } catch (e) { return send(`⚠️ خطای کامیت: ${esc(e.message)}`, MENU_KB) }
   }
   if (cmd === '/cancel') {
     await putKV('pending_edit', 'null')
-    return send('❌ لغو شد.', MENU_KB)
+    return send('❌ لغو شد.')
   }
 
   // ── تغییرات محتوا ──
@@ -367,7 +446,16 @@ async function handleUpdate(update) {
       const { sha, bytes: oldBytes } = await ghGetBinary(PHOTO_PATH)
       await ghCommitBinary(PHOTO_PATH, img, sha, 'bot: update profile photo')
       await putKV('last_commit', JSON.stringify({ type: 'photo', beforeBytes: Array.from(oldBytes), summary: 'عکس پروفایل' }))
-      await send('✅ عکس پروفایل عوض شد!\n↩️ /undo برای برگرداندن\n🚀 deploy خودکار — ~۲ دقیقه\n💡 عکس مربع بهتر نمایش داده می‌شود (صورت وسط کادر).', MENU_KB)
+      return tg('sendMessage', {
+        chat_id: env0.CHAT_ID,
+        text: '✅ <b>عکس پروفایل عوض شد!</b>\n\n🚀 deploy خودکار — ~۲ دقیقه\n💡 عکس مربع با صورت وسط کادر بهترین نتیجه را می‌دهد.',
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '↩️ برگرداندن (undo)', callback_data: 'cmd:/undo' }, { text: '🌐 دیدن سایت', url: SITE_URL }],
+          ],
+        },
+      })
     } catch (e) {
       await send(`⚠️ خطای عکس: ${esc(e.message)}`, MENU_KB)
     }
@@ -427,6 +515,8 @@ export default {
         const update = await request.json()
         if (String(update?.message?.chat?.id) === String(env.CHAT_ID)) {
           await handleUpdate(update)
+        } else if (String(update?.callback_query?.message?.chat?.id) === String(env.CHAT_ID)) {
+          await handleCallback(update.callback_query)
         }
       } catch {}
       return new Response('ok', { headers: cors })
