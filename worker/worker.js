@@ -1,36 +1,26 @@
 // ============================================================
-// Cloudflare Worker v3 — ربات مدیریت رزومه پارسا شیروانی
+// Cloudflare Worker v4 — ربات مدیریت رزومه پارسا شیروانی
 // ============================================================
-// قابلیت‌ها:
-//  1. رویدادهای سایت → اعلان تلگرام (ضداسپم با توکن)
-//  2. فرم تماس → پیام مستقیم
-//  3. دستورات مشاهده: /stats /today /msgs /site /help
-//  4. دستورات تغییر محتوا (کامیت به گیت‌هاب → deploy خودکار):
-//     /menu            منوی کامل
-//     /skill <Name> <0-100>     تغییر درصد مهارت
-//     /skilladd <Name> <0-100>  افزودن مهارت جدید
-//     /skilldel <Name>          حذف مهارت
-//     /proj <شماره> <متن>       تغییر توضیح پروژه (هر دو زبان یکسان)
-//     /addjob <عنوان> | <سازمان> | <دوره> | <مورد1>؛ <مورد2>   افزودن سابقه کاری
-//     /orglink <URL>            لینک رزومه سازمانی
-//     /pdflink <URL>            لینک دکمه دانلود PDF
-//     /text <مسیر> = <متن>      مثال: /text fa.hero.subtitle = متن جدید
-//     /ok                تأیید آخرین تغییر و کامیت
-//     /cancel            لغو تغییر در انتظار
-//  جریان هر تغییر: فرمان → پیش‌نمایش → /ok → commit به main → GitHub Actions خودکار deploy
+// جدید در v4 (علاوه بر v3):
+//   /photo      — عکس را در پاسخ به ربات بفرست → کامیت به public/me.jpg → deploy
+//   /undo       — برگرداندن آخرین تغییر محتوا (فقط content.json و me.jpg)
+//   /backup     — دریافت content.json به عنوان فایل
+//   /qr         — QR code لینک سایت
+//   خلاصه هفتگی — هر جمعه ۲۱:۰۰ UTC با پربازدیدترین پروژه (cron جدا در scheduled)
 //
-// Secrets لازم:
-//   BOT_TOKEN, CHAT_ID, SITE_TOKEN (= مقدار در src/config/notify.js)
-//   GH_TOKEN  = GitHub Personal Access Token با دسترسی repo ( Contents: Read and write )
-//   GH_REPO   = shshsh1385/shshsh1385.github.io
-// اختیاری (KV bind با نام KV برای mute/stats) — بدون KV هم کار می‌کند.
-// Cron Trigger (خلاصه روزانه): 0 21 * * *
+// Secrets: BOT_TOKEN, CHAT_ID, SITE_TOKEN, GH_TOKEN, GH_REPO
+// اختیاری: KV bind (نام متغیر: KV)
+// Cron Triggers (دو تا):
+//   0 21 * * *        → خلاصه روزانه
+//   0 21 * * 5        → خلاصه هفتگی (جمعه‌ها)
 // Webhook: https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WORKER_URL>/webhook
 // ============================================================
 
 const MAX_PER_HOUR = 30
 const MAX_MSG_LEN = 2000
 const CONTENT_PATH = 'src/config/content.json'
+const PHOTO_PATH = 'public/me.jpg'
+const SITE_URL = 'https://shshsh1385.github.io'
 
 const EVENT_ICONS = {
   page_view: '👀', lang_switch: '🌐', resume_download: '📄', resume_print_view: '🖨',
@@ -41,7 +31,7 @@ const EVENT_ICONS = {
 let env0 = {}
 let memCount = { hour: '', n: 0 }
 
-// ─── KV helpers (degrade بدون KV) ───
+// ─── KV helpers ───
 async function getKV(key, fallback) {
   if (env0.KV) { const v = await env0.KV.get(key); return v === null ? fallback : v }
   return fallback
@@ -72,6 +62,20 @@ async function send(text, kb) {
   if (kb) p.reply_markup = { keyboard: kb, resize_keyboard: true }
   return tg('sendMessage', p)
 }
+async function sendFile(filename, bytes, caption) {
+  const fd = new FormData()
+  fd.append('chat_id', env0.CHAT_ID)
+  fd.append('document', new Blob([bytes]), filename)
+  if (caption) fd.append('caption', caption)
+  return fetch(`https://api.telegram.org/bot${env0.BOT_TOKEN}/sendDocument`, { method: 'POST', body: fd }).then(r => r.ok)
+}
+async function sendPhotoBytes(bytes, caption) {
+  const fd = new FormData()
+  fd.append('chat_id', env0.CHAT_ID)
+  fd.append('photo', new Blob([bytes]), 'qr.png')
+  if (caption) fd.append('caption', caption)
+  return fetch(`https://api.telegram.org/bot${env0.BOT_TOKEN}/sendPhoto`, { method: 'POST', body: fd }).then(r => r.ok)
+}
 function faTime(iso) {
   try {
     return new Date(iso).toLocaleString('fa-IR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Tehran' })
@@ -79,8 +83,7 @@ function faTime(iso) {
 }
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 
-// ─── GitHub content API ───
-// Base64 ↔ UTF-8 امن (atob/btoa فقط Latin-1 می‌فهمند و فارسی را خراب می‌کنند)
+// ─── UTF-8-safe Base64 ───
 function b64ToUtf8(b64) {
   const bin = atob(b64.replace(/\n/g, ''))
   const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
@@ -93,6 +96,7 @@ function utf8ToB64(str) {
   return btoa(bin)
 }
 
+// ─── GitHub content API (raw bytes برای عکس) ───
 async function ghGetContent() {
   const r = await fetch(`https://api.github.com/repos/${env0.GH_REPO}/contents/${CONTENT_PATH}`, {
     headers: { Authorization: `Bearer ${env0.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'resume-bot' },
@@ -101,21 +105,36 @@ async function ghGetContent() {
   const j = await r.json()
   return { sha: j.sha, json: JSON.parse(b64ToUtf8(j.content)) }
 }
-async function ghCommit(json, sha, message) {
+async function ghCommitJson(json, sha, message) {
   const r = await fetch(`https://api.github.com/repos/${env0.GH_REPO}/contents/${CONTENT_PATH}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${env0.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'resume-bot', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message,
-      content: utf8ToB64(JSON.stringify(json, null, 2)),
-      sha,
-    }),
+    body: JSON.stringify({ message, content: utf8ToB64(JSON.stringify(json, null, 2)), sha }),
   })
   if (!r.ok) throw new Error(`GitHub PUT ${r.status}: ${await r.text().catch(() => '')}`)
   return true
 }
+async function ghGetBinary(path) {
+  const r = await fetch(`https://api.github.com/repos/${env0.GH_REPO}/contents/${path}`, {
+    headers: { Authorization: `Bearer ${env0.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'resume-bot' },
+  })
+  if (!r.ok) throw new Error(`GitHub GET ${path} ${r.status}`)
+  const j = await r.json()
+  return { sha: j.sha, bytes: Uint8Array.from(atob(j.content.replace(/\n/g, '')), c => c.charCodeAt(0)) }
+}
+async function ghCommitBinary(path, bytes, sha, message) {
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  const r = await fetch(`https://api.github.com/repos/${env0.GH_REPO}/contents/${path}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${env0.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'resume-bot', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, content: btoa(bin), sha }),
+  })
+  if (!r.ok) throw new Error(`GitHub PUT ${path} ${r.status}: ${await r.text().catch(() => '')}`)
+  return true
+}
 
-// ─── EDITORS: هر ادیتور (json) => (json) تغییر‌یافته یا throw ───
+// ─── EDITORS (مانند v3) ───
 const EDITORS = {
   skill(args, json) {
     const [name, level] = args
@@ -123,7 +142,7 @@ const EDITORS = {
     if (!(lv >= 0 && lv <= 100)) throw new Error('درصد باید 0 تا 100 باشد')
     for (const lang of ['fa', 'en']) {
       const s = json[lang].skills.main.find(x => x.name.toLowerCase() === name.toLowerCase())
-      if (!s) throw new Error(`مهارت «${name}» نیست. از /skilladd استفاده کن یا /site ببین لیست را`)
+      if (!s) throw new Error(`مهارت «${name}» نیست. از /skilladd استفاده کن`)
       s.level = lv
     }
     return `مهارت ${name} → ${lv}% (هر دو زبان)`
@@ -161,7 +180,6 @@ const EDITORS = {
     return `توضیح «${names[0]} / ${names[1]}» به‌روز شد`
   },
   addjob(args, json) {
-    // /addjob عنوان | سازمان | دوره | مورد1؛ مورد2؛ مورد3
     const [role, org, period, bullets] = args.join(' ').split('|').map(s => s.trim())
     if (!role || !org || !period) throw new Error('قالب: /addjob عنوان | سازمان | دوره | مورد1؛ مورد2')
     const list = (bullets || '').split('؛').map(s => s.trim()).filter(Boolean)
@@ -172,20 +190,20 @@ const EDITORS = {
     const url = args[0]
     if (!/^https?:\/\/.+/.test(url || '')) throw new Error('قالب: /orglink https://...')
     json.site.orgResumeUrl = url
-    return `لینک رزومه سازمانی ست شد`
+    return 'لینک رزومه سازمانی ست شد'
   },
   pdflink(args, json) {
     const url = args[0]
     if (!/^https?:\/\/.+/.test(url || '')) throw new Error('قالب: /pdflink https://...')
     json.site.resumePdfUrl = url
-    return `لینک دکمه دانلود PDF ست شد`
+    return 'لینک دکمه دانلود PDF ست شد'
   },
 }
 
-// ─── دستورات ───
+// ─── منو ───
 const MENU_KB = [
   ['/stats', '/today'], ['/msgs', '/site'],
-  ['/menu', '/help'],
+  ['/backup', '/qr'], ['/undo', '/menu'],
 ]
 
 async function handleCommand(text) {
@@ -195,25 +213,65 @@ async function handleCommand(text) {
   const cmd = parts[0].toLowerCase()
   const args = parts.slice(1)
 
-  // ── مشاهده ──
   if (cmd === '/menu') {
     return send(
       `🤖 <b>منوی ربات</b>\n\n` +
-      `📊 مشاهده:\n/stats — آمار این ساعت\n/today — خلاصه امروز\n/msgs — پیام‌های فرم تماس (آخرین‌ها)\n/site — وضعیت فعلی محتوا\n\n` +
+      `📊 مشاهده:\n/stats — آمار این ساعت\n/today — خلاصه امروز\n/msgs — پیام‌های فرم تماس\n/site — وضعیت محتوا\n\n` +
+      `🖼 رسانه:\n/photo — عکس پروفایل جدید را بفرست (در همین چت)\n/qr — QR کد سایت\n/backup — دریافت content.json\n\n` +
       `✏️ تغییر محتوا (پیش‌نمایش → /ok):\n` +
-      `/skill Python 92 — درصد مهارت\n` +
-      `/skilladd Tailwind 70 — مهارت جدید\n` +
-      `/skilldel Bootstrap — حذف مهارت\n` +
-      `/proj 1 توضیح جدید — توضیح پروژه\n` +
-      `/addjob عنوان | سازمان | دوره | مورد1؛ مورد2 — سابقه جدید\n` +
-      `/orglink https://... — لینک رزومه سازمانی\n` +
-      `/pdflink https://... — لینک PDF\n` +
-      `/text fa.hero.subtitle = متن — هر متنی\n\n` +
-      `✅ /ok تأیید و انتشار  ❌ /cancel لغو`,
+      `/skill Python 92 · /skilladd Tailwind 70 · /skilldel Bootstrap\n` +
+      `/proj 1 توضیح جدید\n` +
+      `/addjob عنوان | سازمان | دوره | مورد1؛ مورد2\n` +
+      `/orglink https://... · /pdflink https://...\n` +
+      `/text fa.hero.subtitle = متن\n\n` +
+      `↩️ /undo — برگرداندن آخرین تغییر  ✅ /ok  ❌ /cancel`,
       MENU_KB
     )
   }
   if (cmd === '/help') return send('🤖 /menu را بزن برای منوی کامل.', MENU_KB)
+
+  // ── /photo: راهنما (عکس خودش در webhook handler پردازش می‌شود) ──
+  if (cmd === '/photo') {
+    return send('🖼 عکس جدید را همین‌جا بفرست (به‌صورت Photo، نه File). بعد از تأیید، کامیت و deploy می‌شود.', MENU_KB)
+  }
+
+  // ── /qr ──
+  if (cmd === '/qr') {
+    try {
+      const api = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(SITE_URL)}`
+      const img = await (await fetch(api)).arrayBuffer()
+      await sendPhotoBytes(new Uint8Array(img), `🔗 ${SITE_URL}`)
+      return
+    } catch (e) { return send(`⚠️ خطای QR: ${esc(e.message)}`, MENU_KB) }
+  }
+
+  // ── /backup ──
+  if (cmd === '/backup') {
+    try {
+      const { json } = await ghGetContent()
+      await sendFile('content.json', new TextEncoder().encode(JSON.stringify(json, null, 2)), '💾 پشتیبان محتوای سایت')
+      return
+    } catch (e) { return send(`⚠️ خطا: ${esc(e.message)}`, MENU_KB) }
+  }
+
+  // ── /undo ──
+  if (cmd === '/undo') {
+    const last = JSON.parse((await getKV('last_commit', 'null')) || 'null')
+    if (!last) return send('تغییری برای برگرداندن نیست.', MENU_KB)
+    try {
+      if (last.type === 'content') {
+        const { sha } = await ghGetContent()
+        await ghCommitJson(last.before, sha, `bot: undo — ${last.summary}`)
+      } else if (last.type === 'photo') {
+        const { sha } = await ghGetBinary(PHOTO_PATH)
+        await ghCommitBinary(PHOTO_PATH, last.beforeBytes, sha, 'bot: undo — photo')
+      }
+      await putKV('last_commit', 'null')
+      return send(`↩️ برگردانده شد: ${esc(last.summary)}\n🚀 deploy خودکار در جریان است.`, MENU_KB)
+    } catch (e) { return send(`⚠️ خطای undo: ${esc(e.message)}`, MENU_KB) }
+  }
+
+  // ── مشاهده ──
   if (cmd === '/stats') {
     const hour = new Date().toISOString().slice(0, 13)
     const c = await getKV('cnt_' + hour, '0')
@@ -240,17 +298,13 @@ async function handleCommand(text) {
       const skills = json.fa.skills.main.map(s => `${s.name} ${s.level}%`).join(' · ')
       const projects = json.fa.projects.items.map((p, i) => `${i + 1}. ${p.name}`).join('\n')
       return send(
-        `🌐 <b>وضعیت محتوا</b>\n\n` +
-        `🖥 مهارت‌ها: ${esc(skills)}\n\n` +
-        `🔗 پروژه‌ها:\n${esc(projects)}\n\n` +
-        `📄 PDF: ${esc(json.site.resumePdfUrl)}\n` +
-        `🏢 سازمانی: ${json.site.orgResumeUrl ? esc(json.site.orgResumeUrl) : '— هنوز نداره'}`,
+        `🌐 <b>وضعیت محتوا</b>\n\n🖥 مهارت‌ها: ${esc(skills)}\n\n🔗 پروژه‌ها:\n${esc(projects)}\n\n📄 PDF: ${esc(json.site.resumePdfUrl)}\n🏢 سازمانی: ${json.site.orgResumeUrl ? esc(json.site.orgResumeUrl) : '—'}`,
         MENU_KB
       )
-    } catch (e) { return send(`⚠️ خطا در خواندن: ${esc(e.message)}`, MENU_KB) }
+    } catch (e) { return send(`⚠️ خطا: ${esc(e.message)}`, MENU_KB) }
   }
-  if (cmd === '/mute') { await putKV('muted', '1'); return send('🔇 اعلان‌ها بی‌صدا شد (فرم تماس همچنان می‌آید)', MENU_KB) }
-  if (cmd === '/unmute') { await putKV('muted', '0'); return send('🔔 اعلان‌ها فعال شد', MENU_KB) }
+  if (cmd === '/mute') { await putKV('muted', '1'); return send('🔇 بی‌صدا شد (فرم تماس همیشه می‌آید)', MENU_KB) }
+  if (cmd === '/unmute') { await putKV('muted', '0'); return send('🔔 فعال شد', MENU_KB) }
 
   // ── تأیید / لغو ──
   if (cmd === '/ok') {
@@ -258,9 +312,11 @@ async function handleCommand(text) {
     if (!pending) return send('چیزی در انتظار تأیید نیست.', MENU_KB)
     try {
       const { sha, json: current } = await ghGetContent()
-      await ghCommit(pending.json, sha, `bot: ${pending.summary}`)
+      await ghCommitJson(pending.json, sha, `bot: ${pending.summary}`)
+      // برای /undo: نسخه قبلی را نگه دار
+      await putKV('last_commit', JSON.stringify({ type: 'content', before: current, summary: pending.summary }))
       await putKV('pending_edit', 'null')
-      return send(`✅ کامیت شد: ${esc(pending.summary)}\n🚀 GitHub Actions در حال deploy — حدود ۲ دقیقه صبر کن.`, MENU_KB)
+      return send(`✅ کامیت شد: ${esc(pending.summary)}\n↩️ برای برگرداندن: /undo\n🚀 deploy خودکار — ~۲ دقیقه`, MENU_KB)
     } catch (e) { return send(`⚠️ خطای کامیت: ${esc(e.message)}`, MENU_KB) }
   }
   if (cmd === '/cancel') {
@@ -274,7 +330,6 @@ async function handleCommand(text) {
       const { json } = await ghGetContent()
       let summary
       if (cmd === '/text') {
-        // /text fa.hero.subtitle = متن جدید
         const m = raw.match(/^\/text\s+(\S+)\s*=\s*([\s\S]+)$/)
         if (!m) throw new Error('قالب: /text fa.hero.subtitle = متن جدید')
         const [, path, value] = m
@@ -289,22 +344,73 @@ async function handleCommand(text) {
         obj[last] = value.trim()
         summary = `${path} → «${value.trim().slice(0, 40)}»`
       } else {
-        const editor = EDITORS[cmd.replace('/', '')]
-        summary = editor(args, json)
+        summary = EDITORS[cmd.replace('/', '')](args, json)
       }
       await putKV('pending_edit', JSON.stringify({ json, summary, ts: Date.now() }))
-      const preview = JSON.stringify(json, null, 1)
-      return send(
-        `📝 <b>پیش‌نمایش تغییر</b>\n${esc(summary)}\n\n` +
-        `✅ /ok برای انتشار (کامیت + deploy خودکار)\n❌ /cancel لغو\n\n` +
-        `<i>اندازه JSON: ${Math.round(preview.length / 1024)}KB</i>`,
-        [['✅ OK'], ['❌ Cancel'], ...MENU_KB]
-      )
+      return send(`📝 <b>پیش‌نمایش تغییر</b>\n${esc(summary)}\n\n✅ /ok برای انتشار\n❌ /cancel لغو\n↩️ بعد از ok: /undo`, MENU_KB)
     } catch (e) { return send(`⚠️ ${esc(e.message)}`, MENU_KB) }
   }
 }
 
-// ─── Main ───
+// ─── پردازش پیام تلگرام (دستور + عکس) ───
+async function handleUpdate(update) {
+  const msg = update?.message
+  if (!msg) return
+
+  // 🖼 عکس → /photo flow
+  if (msg.photo && Array.isArray(msg.photo) && msg.photo.length) {
+    try {
+      const photo = msg.photo[msg.photo.length - 1] // بزرگ‌ترین سایز
+      const file = await (await fetch(`https://api.telegram.org/bot${env0.BOT_TOKEN}/getFile?file_id=${photo.file_id}`)).json()
+      if (!file?.file_path) throw new Error('getFile failed')
+      const img = new Uint8Array(await (await fetch(`https://api.telegram.org/file/bot${env0.BOT_TOKEN}/${file.file_path}`)).arrayBuffer())
+      const { sha, bytes: oldBytes } = await ghGetBinary(PHOTO_PATH)
+      await ghCommitBinary(PHOTO_PATH, img, sha, 'bot: update profile photo')
+      await putKV('last_commit', JSON.stringify({ type: 'photo', beforeBytes: Array.from(oldBytes), summary: 'عکس پروفایل' }))
+      await send('✅ عکس پروفایل عوض شد!\n↩️ /undo برای برگرداندن\n🚀 deploy خودکار — ~۲ دقیقه\n💡 عکس مربع بهتر نمایش داده می‌شود (صورت وسط کادر).', MENU_KB)
+    } catch (e) {
+      await send(`⚠️ خطای عکس: ${esc(e.message)}`, MENU_KB)
+    }
+    return
+  }
+
+  if (msg.text && String(msg.chat.id) === String(env0.CHAT_ID)) {
+    await handleCommand(msg.text)
+  }
+}
+
+// ─── خلاصه‌ها ───
+async function dailyDigest() {
+  const today = new Date().toISOString().slice(0, 10)
+  const keys = ['page_view', 'resume_download', 'project_click', 'contact_message']
+  const lines = []
+  for (const k of keys) lines.push(`${EVENT_ICONS[k]} ${k}: ${await getKV(`day_${today}_${k}`, '0')}`)
+  await send(`📊 <b>خلاصه امروز (${today})</b>\n${lines.join('\n')}`)
+}
+async function weeklyDigest() {
+  const weekKey = 'week_' + Math.floor(Date.now() / (7 * 864e5))
+  const lines = []
+  const today = new Date().toISOString().slice(0, 10)
+  for (const k of ['page_view', 'resume_download', 'contact_message']) {
+    // هفتگی: جمع روزهای اخیر — ساده: از کلیدهای روزهای این هفته
+    let total = 0
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(Date.now() - d * 864e5).toISOString().slice(0, 10)
+      total += parseInt((await getKV(`day_${day}_${k}`, '0')) || '0', 10)
+    }
+    lines.push(`${EVENT_ICONS[k]} ${k}: ${total}`)
+  }
+  // پربازدیدترین پروژه این هفته
+  let top = '—'
+  let topN = 0
+  const projCounts = JSON.parse((await getKV(weekKey + '_projects', '{}')))
+  for (const [name, n] of Object.entries(projCounts)) {
+    if (n > topN) { topN = n; top = name }
+  }
+  lines.push(`🏆 پربازدیدترین پروژه هفته: ${esc(top)}${topN ? ` (${topN} کلیک)` : ''}`)
+  await send(`📈 <b>خلاصه هفتگی</b>\n${lines.join('\n')}`)
+}
+
 export default {
   async fetch(request, env, ctx) {
     env0 = env
@@ -316,20 +422,16 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors })
     const url = new URL(request.url)
 
-    // webhook تلگرام
     if (request.method === 'POST' && url.pathname === '/webhook') {
       try {
         const update = await request.json()
-        const msg = update?.message
-        if (msg?.text && String(msg.chat.id) === String(env.CHAT_ID)) {
-          // ذخیره پیام‌های غیردستوری به عنوان نکته؟ نه — فقط دستورات
-          await handleCommand(msg.text)
+        if (String(update?.message?.chat?.id) === String(env.CHAT_ID)) {
+          await handleUpdate(update)
         }
       } catch {}
       return new Response('ok', { headers: cors })
     }
 
-    // رویداد سایت
     if (request.method === 'POST') {
       let body
       try { body = await request.json() } catch { body = null }
@@ -337,7 +439,6 @@ export default {
         return new Response(JSON.stringify({ ok: false, err: 'bad token' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } })
       }
 
-      // فرم تماس: همیشه بفرست + ذخیره در KV برای /msgs
       if (body.event === 'contact_message') {
         const name = String(body.detail?.name || '').slice(0, 60)
         const msg = String(body.detail?.message || '').slice(0, MAX_MSG_LEN)
@@ -352,10 +453,17 @@ export default {
         return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
       }
 
-      // شمارنده روزانه برای /today
       const today = new Date().toISOString().slice(0, 10)
       const dayKey = `day_${today}_${body.event}`
       await putKV(dayKey, parseInt((await getKV(dayKey, '0')) || '0', 10) + 1)
+
+      // آمار کلیک پروژه برای پربازدیدترین هفتگی
+      if (body.event === 'project_click' && body.detail?.project) {
+        const weekKey = 'week_' + Math.floor(Date.now() / (7 * 864e5))
+        const projCounts = JSON.parse((await getKV(weekKey + '_projects', '{}')))
+        projCounts[body.detail.project] = (projCounts[body.detail.project] || 0) + 1
+        await putKV(weekKey + '_projects', JSON.stringify(projCounts))
+      }
 
       const country = request.cf?.country || ''
       const lang = body.detail?.lang === 'en' ? 'EN' : body.detail?.lang === 'fa' ? 'FA' : ''
@@ -376,7 +484,6 @@ export default {
       return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
-    // GET با ?cmd= (روش بدون webhook)
     if (request.method === 'GET') {
       const cmd = url.searchParams.get('cmd')
       if (cmd) await handleCommand(cmd)
@@ -387,10 +494,9 @@ export default {
 
   async scheduled(event, env, ctx) {
     env0 = env
-    const today = new Date().toISOString().slice(0, 10)
-    const keys = ['page_view', 'resume_download', 'project_click', 'contact_message']
-    const lines = []
-    for (const k of keys) lines.push(`${EVENT_ICONS[k]} ${k}: ${await getKV(`day_${today}_${k}`, '0')}`)
-    await send(`📊 <b>خلاصه امروز (${today})</b>\n${lines.join('\n')}`)
+    const cron = event.cron || ''
+    // دو cron: روزانه 0 21 * * * و هفتگی 0 21 * * 5
+    if (cron === '0 21 * * 5') await weeklyDigest()
+    else await dailyDigest()
   },
 }
