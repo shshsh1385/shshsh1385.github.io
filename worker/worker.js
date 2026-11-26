@@ -440,12 +440,20 @@ async function handleUpdate(update) {
   if (msg.photo && Array.isArray(msg.photo) && msg.photo.length) {
     try {
       const photo = msg.photo[msg.photo.length - 1] // بزرگ‌ترین سایز
-      const fr = await fetch(`https://api.telegram.org/bot${env0.BOT_TOKEN}/getFile?file_id=${encodeURIComponent(photo.file_id)}`)
+      const fr = await fetch(`https://api.telegram.org/bot${env0.BOT_TOKEN}/getFile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_id: photo.file_id }),
+      })
       const file = await fr.json().catch(() => null)
-      if (!fr.ok || !file?.file_path) {
-        throw new Error(`getFile ${fr.status}: ${esc(file?.description || fr.statusText || 'unknown')}`)
+      // پاسخ موفق تلگرام: { ok: true, result: { file_path: ... } }
+      const filePath = file?.ok ? file.result?.file_path : null
+      if (!filePath) {
+        throw new Error(`getFile ${fr.status}: ${file?.description || fr.statusText || 'no file_path'}`)
       }
-      const img = new Uint8Array(await (await fetch(`https://api.telegram.org/file/bot${env0.BOT_TOKEN}/${file.file_path}`)).arrayBuffer())
+      const dl = await fetch(`https://api.telegram.org/file/bot${env0.BOT_TOKEN}/${filePath}`)
+      if (!dl.ok) throw new Error(`دانلود فایل ${dl.status}`)
+      const img = new Uint8Array(await dl.arrayBuffer())
       if (!img.length) throw new Error('فایل خالی از تلگرام')
       const { sha, bytes: oldBytes } = await ghGetBinary(PHOTO_PATH)
       await ghCommitBinary(PHOTO_PATH, img, sha, 'bot: update profile photo')
