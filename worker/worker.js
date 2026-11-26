@@ -80,13 +80,26 @@ function faTime(iso) {
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 
 // ─── GitHub content API ───
+// Base64 ↔ UTF-8 امن (atob/btoa فقط Latin-1 می‌فهمند و فارسی را خراب می‌کنند)
+function b64ToUtf8(b64) {
+  const bin = atob(b64.replace(/\n/g, ''))
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+  return new TextDecoder('utf-8').decode(bytes)
+}
+function utf8ToB64(str) {
+  const bytes = new TextEncoder().encode(str)
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin)
+}
+
 async function ghGetContent() {
   const r = await fetch(`https://api.github.com/repos/${env0.GH_REPO}/contents/${CONTENT_PATH}`, {
     headers: { Authorization: `Bearer ${env0.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'resume-bot' },
   })
   if (!r.ok) throw new Error(`GitHub GET ${r.status}`)
   const j = await r.json()
-  return { sha: j.sha, json: JSON.parse(atob(j.content.replace(/\n/g, ''))) }
+  return { sha: j.sha, json: JSON.parse(b64ToUtf8(j.content)) }
 }
 async function ghCommit(json, sha, message) {
   const r = await fetch(`https://api.github.com/repos/${env0.GH_REPO}/contents/${CONTENT_PATH}`, {
@@ -94,7 +107,7 @@ async function ghCommit(json, sha, message) {
     headers: { Authorization: `Bearer ${env0.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'resume-bot', 'Content-Type': 'application/json' },
     body: JSON.stringify({
       message,
-      content: btoa(unescape(encodeURIComponent(JSON.stringify(json, null, 2)))),
+      content: utf8ToB64(JSON.stringify(json, null, 2)),
       sha,
     }),
   })
